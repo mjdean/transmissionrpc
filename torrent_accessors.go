@@ -56,6 +56,17 @@ func (c *Client) TorrentGetHashes(ctx context.Context, fields []string, hashes [
 	return c.torrentGetHash(ctx, fields, hashes)
 }
 
+func (c *Client) TorrentGetAllForActive(ctx context.Context) (torrents []Torrent, removed []int64, err error) {
+	return c.torrentGetActive(ctx, validTorrentFields)
+}
+
+func (c *Client) TorrentGetActive(ctx context.Context, fields []string) (torrents []Torrent, removed []int64, err error) {
+	if err = c.validateTorrentFields(fields); err != nil {
+		return
+	}
+	return c.torrentGetActive(ctx, fields)
+}
+
 func (c *Client) validateTorrentFields(fields []string) (err error) {
 	// Validate fields
 	var fieldInvalid bool
@@ -102,6 +113,20 @@ func (c *Client) torrentGetHash(ctx context.Context, fields []string, hashes []s
 	return
 }
 
+func (c *Client) torrentGetActive(ctx context.Context, fields []string) (torrents []Torrent, removed []int64, err error) {
+	var result torrentGetActiveResults
+	if err = c.rpcCall(ctx, "torrent-get", &torrentGetActiveParams{
+		Fields: fields,
+		ID:     "recently-active",
+	}, &result); err != nil {
+		err = fmt.Errorf("'torrent-get' rpc method failed: %w", err)
+		return
+	}
+	torrents = result.Torrents
+	removed = result.Removed
+	return
+}
+
 type torrentGetParams struct {
 	Fields []string `json:"fields"`
 	IDs    []int64  `json:"ids,omitempty"`
@@ -112,8 +137,18 @@ type torrentGetHashParams struct {
 	Hashes []string `json:"ids,omitempty"`
 }
 
+type torrentGetActiveParams struct {
+	Fields []string `json:"fields"`
+	ID     string   `json:"ids"`
+}
+
 type torrentGetResults struct {
 	Torrents []Torrent `json:"torrents"`
+}
+
+type torrentGetActiveResults struct {
+	Torrents []Torrent `json:"torrents"`
+	Removed  []int64   `json:"removed"`
 }
 
 // Torrent represents all the possible fields of data for a torrent.
